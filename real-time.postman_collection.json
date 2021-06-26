@@ -1,0 +1,63 @@
+{
+	"info": {
+		"_postman_id": "018ed0ae-117b-4ff9-8248-da5ddccc9b08",
+		"name": "real-time",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "send-message",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "userId",
+							"value": "301",
+							"description": "required",
+							"type": "text"
+						},
+						{
+							"key": "rId",
+							"value": "12",
+							"type": "text"
+						},
+						{
+							"key": "message",
+							"value": "الحمد لله حمدا طيبا مباركا فيه",
+							"type": "text"
+						},
+						{
+							"key": "type",
+							"value": "text",
+							"type": "text"
+						},
+						{
+							"key": "message",
+							"value": "'[{\"lat\":31.21587000000000,\"lng\":31.35701000000000}]'",
+							"type": "text",
+							"disabled": true
+						}
+					]
+				},
+				"url": {
+					"raw": "http://127.0.0.1:3000/send-message",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "3000",
+					"path": [
+						"send-message"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
