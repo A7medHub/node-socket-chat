@@ -13,15 +13,15 @@
 <script type="text/javascript">
     var socket = io('http://127.0.0.1:3000' ,{transports: ['websocket', 'polling', 'flashsocket']});
 
-
-    socket.emit('subscribe', 14);
+    socket.emit('subscribe',{room_id:14,user_id :301});
+    //socket  .  emit(  'unsubscribe'  , {room_id: 14 , user_id : 301});
 
     socket.on('sendMessage',function (msg){
        console.log(msg)
     });
 
     socket.on('entered',function (msg){
-       console.log(msg)
+       // console.log(msg)
     });
 </script>
 </body>

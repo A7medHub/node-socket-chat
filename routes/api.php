@@ -27,7 +27,7 @@ Route::group(['prefix'                  => 'v1'            , 'namespace' => 'Api
 
         Route::group(['middleware'       => ['jwt']]        , function (){
                 #logout
-              
+
                 Route::post('send-message'              , 'ChatController@sendMessage')             ;
                 #rooms
                 Route::get('rooms'                      , 'ChatController@rooms')                   ;

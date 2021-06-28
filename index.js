@@ -1,21 +1,59 @@
 
+const express       = require('express');
+const app           = express();
+const http          = require('http');
+const fs            = require('fs');
+const https         = require('https');
+var socketIO        = require('socket.io');
+var bodyParser      = require("body-parser");
+var mysql           = require('mysql');
+const port          = 4576;
+const URL           = 'wsslna.4hoste.com';
+
+var FCM             = require('fcm-node');
+var serverKey       = "AAAA4wXI_9Q:APA91bGaQG1degoGjb2LQNGDHHMjysP27Ur4vf-2rYCJNp-5WKaxEHf43BY5hN_-Zl9o0iq9w3TC22J-ND5y8xijiV5LYCgUBF2u_b33p3GxnVXGHWIpLi8WpOu8uDs4ra6CPu84wL1K";
+var fcm             = new FCM(serverKey);
+
+const privateKey    = fs.readFileSync('/var/cpanel/ssl/apache_tls/voo.4hoste.com/combined', 'utf8');
+const certificate   = fs.readFileSync('/var/cpanel/ssl/apache_tls/voo.4hoste.com/certificates', 'utf8');
+const ca            = fs.readFileSync('/var/cpanel/ssl/apache_tls/voo.4hoste.com/combined', 'utf8');
+
+const httpsServer   = https.createServer({
+    key             : privateKey,
+    cert            : certificate,
+    ca              : ca
+}, app).listen(4576, () => {
+    console.log('HTTPS Server running on port 4576');
+});
+
+const httpServer    = http.createServer(app).listen(9036, (req,res) => {
+    console.log('HTTP Server running on port 9036');
+});
+
+const io            = socketIO(httpsServer);
 
 
+/*
+For localhost
 const express = require('express');
 const app = express();
 const http = require('http');
 const server = http.createServer(app);
 const { Server } = require("socket.io");
+var bodyParser      = require("body-parser");
+var FCM = require('fcm-node');
+var serverKey       = "AAAA4wXI_9Q:APA91bGaQG1degoGjb2LQNGDHHMjysP27Ur4vf-2rYCJNp-5WKaxEHf43BY5hN_-Zl9o0iq9w3TC22J-ND5y8xijiV5LYCgUBF2u_b33p3GxnVXGHWIpLi8WpOu8uDs4ra6CPu84wL1K";
+var fcm = new FCM(serverKey);
 const io = new Server(server, {
     cors: {
         origin: '*',
     }
 });
 var mysql      = require('mysql');
-
 const port = 3000;
 const URL = 'http://127.0.0.1:8000';
 
+*/
 
 
 
@@ -23,6 +61,7 @@ server.listen(port, () => {
     console.log('listening on *:3000');
 });
 
+var subscriptions   = [];
 // انشاء الاتصال مع قاعدة البيانات
 var connection = mysql.createConnection({
     host     : 'localhost',
@@ -33,7 +72,8 @@ var connection = mysql.createConnection({
 
 connection.connect();
 
-
+app.use(bodyParser.urlencoded({extended: false, limit: '500mb', parameterLimit: 100000000000}));
+    app.use(bodyParser.json());
 
 // ميثود ارسال رسالة
 app.post('/send-message',express.urlencoded() ,function (req, res) {
@@ -110,20 +150,65 @@ app.post('/send-message',express.urlencoded() ,function (req, res) {
                        let chat   =   JSON.parse(JSON.stringify(result[0]));
 
                      let response = {
-                         id     : chat.id,
-                         message: chat.type === 'map' ? JSON.parse(chat.message) : chat.message,
-                         user   : {
+                         id        : chat.id,
+                         message   : chat.type === 'map' ? JSON.parse(chat.message) : chat.message,
+                         user      : {
                              name  : chat.name,
                              avatar: `https://${URL}/storage/images/users/${chat.avatar}`
                          },
-                         time     :     new Date().toLocaleTimeString(),
-                         type     : chat.type ,
-                         alignItem: 'right'
+                         time      : new Date().toLocaleTimeString(),
+                         type      : chat.type ,
+                         alignItem : 'right'
                      };
 
-                     //io.sockets.emit('sendMessage',response);
 
-                     io.sockets.to(roomId).emit('sendMessage', response);
+                     let found = subscriptions.some(item => {
+                       return   item.room_id == roomId && item.user_id == userId
+                     });
+
+                     if(found)
+                     {
+                         io.sockets.to(roomId).emit('sendMessage', response);
+                     }else{
+                         connection.query("SELECT * FROM `user_tokens`   WHERE user_id="+userId+"  ", function (err, results) {
+                             if (err) throw err;
+
+                             results.forEach((row) => {
+                                 if(chat.type === 'map'){
+                                     body_ar  = 'قام بارسال الموقع';
+                                     body_en  = 'Send you a location';
+                                 }else{
+                                     body_ar  = chat.message;
+                                     body_en  = chat.message;
+                                 }
+                             });
+
+                                 var message   = {
+                                     to           : row.device_id,
+                                     notification : row.device_type === 'ios' ?{
+                                         title    : chat.name,
+                                         message  : body_ar,
+                                         sound    : "default"
+                                     } : null,
+                                     data: {
+                                         title    : chat.name,
+                                         body_ar  : body_ar,
+                                         body_en  : body_en,
+                                         avatar   : `https://${URL}/storage/images/users/${chat.avatar}`,
+                                         room_id  : roomId,
+                                         key      : 'new_message'
+                                     }
+                                 };
+
+                             fcm.send(message, function(err, response){
+                                 if (err) {
+                                      console.log("Something has gone wrong!");
+                                 } else {
+                                      console.log("Successfully sent with response: ", response);
+                                 }
+                             });
+                         });
+                     }
                      res.json({ key: 'success' , 'msg' : '' , 'data' : response });
                  });
              });
@@ -133,26 +218,54 @@ app.post('/send-message',express.urlencoded() ,function (req, res) {
 
 
 
+
 app.get('/', (req, res) => {
     io.on('connection', (socket) => {
-        socket.on('subscribe',function (room){
-            socket.join(room);
-            io.sockets.in(room).emit('entered',{mes:"you are added into " + room})
+        socket.on('subscribe',function (item){
+                if(!containsObject(item,subscriptions))
+                {
+                     subscriptions.push(item);
+                     socket.join(item.room_id);
+                    io.sockets.in(item).emit('entered',{
+                        msg: item
+                    })
+                }
+            });
+
+            socket.on('unsubscribe',function (item){
+                subscriptions.splice(item, 1);
+            });
         });
-    });
     res.sendFile(__dirname + '/index.html');
 });
 
+
 app.get('/private', (req, res) => {
     io.on('connection', (socket) => {
-        socket.on('subscribe',function (room){
-            socket.join(room);
-            io.sockets.in(room).emit('entered',{mes:"you are added into " + room})
+         socket.on('subscribe',function (item){
+            if(!containsObject(item,subscriptions))
+            {
+                socket.join(item);
+                subscriptions.push(item);
+                console.log('subscript' , subscriptions);
+                io.sockets.in(item).emit('entered',{
+                    msg: item
+                })
+            }
         });
     });
     res.sendFile(__dirname + '/private.html');
 });
 
-
+function containsObject(obj, list) {
+    let i;
+    for (i = 0; i < list.length; i++)
+    {
+        if (list[i] === obj) {
+            return true;
+        }
+    }
+    return false;
+}
 
  
